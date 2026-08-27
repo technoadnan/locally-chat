@@ -109,6 +109,7 @@ exports[`exportToSvg > with default arguments 1`] = `
     "open": false,
     "panels": 3,
   },
+  "stylesPanelOpen": false,
   "suggestedBinding": null,
   "theme": "light",
   "toast": null,

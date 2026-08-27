@@ -6104,6 +6104,9 @@ class App extends React.Component<AppProps, AppState> {
         // only the text tool offers arrow-endpoint binding, and the highlight
         // is refreshed on pointermove — don't leave a stale one behind
         hoveredArrowTextAnchor: null,
+        // a tool starts with its styles panel closed; double-clicking the
+        // tool's button re-opens it
+        stylesPanelOpen: false,
       } as const;
 
       if (nextActiveTool.type === "freedraw") {
@@ -6145,6 +6148,15 @@ class App extends React.Component<AppProps, AppState> {
 
   setOpenDialog = (dialogType: AppState["openDialog"]) => {
     this.setState({ openDialog: dialogType });
+  };
+
+  /**
+   * Opens/closes the styles panel for the active tool. Only meaningful while a
+   * drawing tool is active — the panel shown for a selection follows from the
+   * selection itself (see `showSelectedShapeActions`).
+   */
+  setStylesPanelOpen = (open: boolean) => {
+    this.setState({ stylesPanelOpen: open });
   };
 
   /**

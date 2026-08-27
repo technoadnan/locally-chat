@@ -20,7 +20,7 @@ describe("element locking", () => {
 
   describe("properties when tool selected", () => {
     it("should show active background top picks", () => {
-      UI.clickTool("rectangle");
+      UI.clickToolWithStyles("rectangle");
 
       const color = DEFAULT_ELEMENT_BACKGROUND_PICKS[1];
 
@@ -38,7 +38,7 @@ describe("element locking", () => {
     });
 
     it("should show fill style when background non-transparent", () => {
-      UI.clickTool("rectangle");
+      UI.clickToolWithStyles("rectangle");
 
       const color = DEFAULT_ELEMENT_BACKGROUND_PICKS[1];
 
@@ -60,7 +60,7 @@ describe("element locking", () => {
     });
 
     it("should not show fill style when background transparent", () => {
-      UI.clickTool("rectangle");
+      UI.clickToolWithStyles("rectangle");
 
       API.setAppState({
         currentItemBackgroundColor: COLOR_PALETTE.transparent,
@@ -72,7 +72,7 @@ describe("element locking", () => {
     });
 
     it("should show horizontal text align for text tool", () => {
-      UI.clickTool("text");
+      UI.clickToolWithStyles("text");
 
       API.setAppState({
         currentItemTextAlign: "right",

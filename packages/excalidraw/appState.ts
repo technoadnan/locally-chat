@@ -85,6 +85,7 @@ export const getDefaultAppState = (): Omit<
     openMenu: null,
     openPopup: null,
     openSidebar: null,
+    stylesPanelOpen: false,
     openDialog: null,
     previousSelectedElementIds: {},
     resizingElement: null,
@@ -225,6 +226,8 @@ const APP_STATE_STORAGE_CONF = (<
   openMenu: { browser: true, export: false, server: false },
   openPopup: { browser: false, export: false, server: false },
   openSidebar: { browser: true, export: false, server: false },
+  // transient: a tool always starts with its styles panel closed
+  stylesPanelOpen: { browser: false, export: false, server: false },
   openDialog: { browser: false, export: false, server: false },
   previousSelectedElementIds: { browser: true, export: false, server: false },
   resizingElement: { browser: false, export: false, server: false },

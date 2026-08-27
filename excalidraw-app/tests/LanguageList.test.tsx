@@ -39,7 +39,7 @@ describe("Test LanguageList", () => {
     );
 
     // select rectangle tool to show properties menu
-    UI.clickTool("rectangle");
+    UI.clickToolWithStyles("rectangle");
     // english lang should display `thin` label
     expect(screen.queryByTitle(/thin/i)).not.toBeNull();
     fireEvent.click(document.querySelector(".dropdown-menu-button")!);

@@ -27,7 +27,7 @@ beforeEach(async () => {
 
   // The bounds of hand-drawn linear elements may change after flipping, so
   // removing this style for testing
-  UI.clickTool("arrow");
+  UI.clickToolWithStyles("arrow");
   UI.clickByTitle("Architect");
   UI.clickTool("selection");
 });

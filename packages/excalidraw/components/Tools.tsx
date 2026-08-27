@@ -306,6 +306,13 @@ const createToolButton = (
             app.setActiveTool({ type });
           }
         }}
+        onDoubleSelect={() => {
+          // double-clicking a tool opens its styles panel (and closes it
+          // again). The gesture's two clicks have already activated the tool
+          // via `onSelect`, and activation resets the flag, so reading it here
+          // reflects this tool's panel rather than the previous tool's.
+          app.setStylesPanelOpen(!app.state.stylesPanelOpen);
+        }}
       />
     );
   };

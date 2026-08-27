@@ -73,7 +73,7 @@ describe("appState", () => {
       />,
     );
 
-    UI.clickTool("text");
+    UI.clickToolWithStyles("text");
 
     expect(h.state.currentItemFontSize).toBe(30);
     fireEvent.click(queryByTestId(container, "fontSize-small")!);

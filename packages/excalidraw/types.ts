@@ -453,6 +453,15 @@ export interface AppState {
     | "compactArrowProperties"
     | null;
   openSidebar: { name: SidebarName; tab?: SidebarTabName } | null;
+  /**
+   * Whether the styles panel (SelectedShapeActions) was explicitly opened for
+   * the active tool, by double-clicking its toolbar button. Activating a tool
+   * with a single click (or a keyboard shortcut) leaves it closed, so the tool
+   * draws with its current settings without the panel taking up the canvas.
+   * Has no bearing on the panel shown for a selection — that still follows
+   * from having elements selected.
+   */
+  stylesPanelOpen: boolean;
   openDialog:
     | null
     | { name: "imageExport" | "help" | "jsonExport" }
@@ -1135,6 +1144,7 @@ export type AppClassProperties = {
   toggleLock: App["toggleLock"];
   setActiveTool: App["setActiveTool"];
   setOpenDialog: App["setOpenDialog"];
+  setStylesPanelOpen: App["setStylesPanelOpen"];
   insertEmbeddableElement: App["insertEmbeddableElement"];
   onMagicframeToolSelect: App["onMagicframeToolSelect"];
   getName: App["getName"];

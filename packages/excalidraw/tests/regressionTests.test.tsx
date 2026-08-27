@@ -656,7 +656,7 @@ describe("regression tests", () => {
   });
 
   it("updates fontSize & fontFamily appState", () => {
-    UI.clickTool("text");
+    UI.clickToolWithStyles("text");
     expect(h.state.currentItemFontFamily).toEqual(FONT_FAMILY.Excalifont);
     fireEvent.click(screen.getByTitle(/code/i));
     expect(h.state.currentItemFontFamily).toEqual(FONT_FAMILY["Comic Shanns"]);
@@ -978,7 +978,7 @@ describe("regression tests", () => {
       "and given B partially overlaps A " +
       "when there's a shift-click on the overlapped section B is added to the selection",
     () => {
-      UI.clickTool("rectangle");
+      UI.clickToolWithStyles("rectangle");
       // change background color since default is transparent
       // and transparent elements can't be selected by clicking inside of them
       togglePopover("Background");
