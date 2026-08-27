@@ -2,6 +2,8 @@ import {
   loginIcon,
   ExcalLogo,
   eyeIcon,
+  file as fileIcon,
+  PlusIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import { useI18n } from "@excalidraw/excalidraw/i18n";
 import { MainMenu } from "@excalidraw/excalidraw/index";
@@ -22,10 +24,19 @@ export const AppMainMenu: React.FC<{
   isCollabEnabled: boolean;
   theme: Theme | "system";
   refresh: () => void;
+  onOpenNoteSessions: () => void;
+  onCreateNoteSession: () => void;
 }> = React.memo((props) => {
   const { t } = useI18n();
   return (
     <MainMenu>
+      <MainMenu.Item icon={fileIcon} onSelect={props.onOpenNoteSessions}>
+        Note sessions
+      </MainMenu.Item>
+      <MainMenu.Item icon={PlusIcon} onSelect={props.onCreateNoteSession}>
+        New note session
+      </MainMenu.Item>
+      <MainMenu.Separator />
       <MainMenu.DefaultItems.LoadScene />
       <MainMenu.DefaultItems.SaveToActiveFile />
       <MainMenu.DefaultItems.Export />

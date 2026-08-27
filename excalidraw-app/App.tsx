@@ -21,6 +21,7 @@ import { ShareableLinkDialog } from "@excalidraw/excalidraw/components/Shareable
 import Trans from "@excalidraw/excalidraw/components/Trans";
 import {
   APP_NAME,
+  DEFAULT_SIDEBAR,
   EVENT,
   VERSION_TIMEOUT,
   debounce,
@@ -90,6 +91,7 @@ import {
 import {
   FIREBASE_STORAGE_PREFIXES,
   isExcalidrawPlusSignedUser,
+  NOTE_SESSIONS_SIDEBAR_TAB,
   STORAGE_KEYS,
   SYNC_BROWSER_TABS_TIMEOUT,
 } from "./app_constants";
@@ -118,9 +120,19 @@ import {
 import { updateStaleImageStatuses } from "./data/FileManager";
 import { FileStatusStore } from "./data/fileStatusStore";
 import {
-  importFromLocalStorage,
+  importNoteSessionFromStorage,
   importUsernameFromLocalStorage,
 } from "./data/localStorage";
+import {
+  createNoteSession,
+  deleteNoteSession,
+  duplicateNoteSession,
+  getActiveNoteSessionId,
+  initializeNoteSessions,
+  loadNoteSessions,
+  renameNoteSession,
+  setActiveNoteSessionId,
+} from "./data/noteSessions";
 
 import { loadFilesFromFirebase } from "./data/firebase";
 import {
@@ -150,6 +162,7 @@ import { ExcalidrawPlusPromoBanner } from "./components/ExcalidrawPlusPromoBanne
 import { AppSidebar } from "./components/AppSidebar";
 
 import type { CollabAPI } from "./collab/Collab";
+import type { NoteSessionMeta } from "./data/noteSessions";
 
 polyfill();
 
@@ -218,7 +231,11 @@ const initializeScene = async (opts: {
   collabAPI: CollabAPI | null;
   excalidrawAPI: ExcalidrawImperativeAPI;
 }): Promise<
-  { scene: ExcalidrawInitialDataState | null } & (
+  {
+    scene: ExcalidrawInitialDataState | null;
+    /** the note session the scene belongs to / was loaded into */
+    noteSession: NoteSessionMeta;
+  } & (
     | { isExternalScene: true; id: string; key: string }
     | { isExternalScene: false; id?: null; key?: null }
   )
@@ -230,7 +247,8 @@ const initializeScene = async (opts: {
   );
   const externalUrlMatch = window.location.hash.match(/^#url=(.*)$/);
 
-  const localDataState = importFromLocalStorage();
+  const noteSession = await initializeNoteSessions();
+  const localDataState = await importNoteSessionFromStorage(noteSession);
 
   let scene: Omit<
     RestoredDataState,
@@ -312,7 +330,7 @@ const initializeScene = async (opts: {
         !scene.elements.length ||
         (await openConfirmModal(shareableLinkConfirmDialog))
       ) {
-        return { scene: data, isExternalScene };
+        return { scene: data, isExternalScene, noteSession };
       }
     } catch (error: any) {
       return {
@@ -322,6 +340,7 @@ const initializeScene = async (opts: {
           },
         },
         isExternalScene,
+        noteSession,
       };
     }
   }
@@ -358,6 +377,7 @@ const initializeScene = async (opts: {
       isExternalScene: true,
       id: roomLinkData.roomId,
       key: roomLinkData.roomKey,
+      noteSession,
     };
   } else if (scene) {
     return isExternalScene && jsonBackendMatch
@@ -366,10 +386,11 @@ const initializeScene = async (opts: {
           isExternalScene,
           id: jsonBackendMatch[1],
           key: jsonBackendMatch[2],
+          noteSession,
         }
-      : { scene, isExternalScene: false };
+      : { scene, isExternalScene: false, noteSession };
   }
-  return { scene: null, isExternalScene: false };
+  return { scene: null, isExternalScene: false, noteSession };
 };
 
 const ExcalidrawWrapper = () => {
@@ -531,7 +552,7 @@ const ExcalidrawWrapper = () => {
               ),
             ]);
           });
-        } else if (isInitialLoad) {
+        } else {
           if (fileIds.length) {
             LocalData.fileStorage
               .getFiles(fileIds)
@@ -546,15 +567,155 @@ const ExcalidrawWrapper = () => {
                 });
               });
           }
-          // on fresh load, clear unused files from IDB (from previous
-          // session)
-          LocalData.fileStorage.clearObsoleteFiles({
-            currentFileIds: fileIds,
-          });
+          if (isInitialLoad) {
+            // on fresh load, clear files no note session references any more
+            LocalData.fileStorage.clearObsoleteFiles({
+              currentFileIds: fileIds,
+            });
+          }
         }
       }
     },
     [collabAPI, excalidrawAPI],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Note sessions
+  // ---------------------------------------------------------------------------
+
+  const [noteSessions, setNoteSessions] = useState<NoteSessionMeta[]>(() =>
+    loadNoteSessions(),
+  );
+  const [activeNoteSessionId, setActiveNoteSessionIdState] = useState<
+    string | null
+  >(() => getActiveNoteSessionId());
+
+  /** the session whose scene is currently loaded in the editor */
+  const loadedNoteSessionIdRef = useRef<string | null>(null);
+
+  const syncNoteSessionsFromStorage = useCallback(() => {
+    setNoteSessions(loadNoteSessions());
+    setActiveNoteSessionIdState(getActiveNoteSessionId());
+  }, []);
+
+  /**
+   * Swaps the scene currently in the editor for the given session's. Assumes
+   * the outgoing session has already been persisted (or deliberately dropped).
+   */
+  const loadNoteSessionIntoEditor = useCallback(
+    async (id: string) => {
+      if (!excalidrawAPI) {
+        return;
+      }
+
+      const session = loadNoteSessions().find((session) => session.id === id);
+      if (!session) {
+        return;
+      }
+
+      const data = await importNoteSessionFromStorage(session);
+      loadedNoteSessionIdRef.current = id;
+
+      excalidrawAPI.updateScene({
+        elements: restoreElements(data.elements, null, {
+          repairBindings: true,
+        }),
+        appState: {
+          ...restoreAppState(data.appState, null),
+          // keep the sidebar as the user left it — it's how they got here
+          openSidebar: excalidrawAPI.getAppState().openSidebar,
+        },
+        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+      });
+      // otherwise undo would pull the previous session's scene into this one
+      excalidrawAPI.history.clear();
+
+      loadImages({
+        scene: data,
+        isExternalScene: false,
+        noteSession: session,
+      });
+
+      syncNoteSessionsFromStorage();
+    },
+    [excalidrawAPI, loadImages, syncNoteSessionsFromStorage],
+  );
+
+  const openNoteSession = useCallback(
+    async (id: string) => {
+      if (!excalidrawAPI || id === loadedNoteSessionIdRef.current) {
+        return;
+      }
+      // persist pending edits to the session we're leaving before switching.
+      // `LocalData.save` captures its target session up front, so this lands on
+      // the outgoing session even though the active id is about to change.
+      await LocalData.flushSave();
+      setActiveNoteSessionId(id);
+      await loadNoteSessionIntoEditor(id);
+    },
+    [excalidrawAPI, loadNoteSessionIntoEditor],
+  );
+
+  const openNoteSessionsSidebar = useCallback(() => {
+    excalidrawAPI?.toggleSidebar({
+      name: DEFAULT_SIDEBAR.name,
+      tab: NOTE_SESSIONS_SIDEBAR_TAB,
+      force: true,
+    });
+  }, [excalidrawAPI]);
+
+  const handleCreateNoteSession = useCallback(() => {
+    const session = createNoteSession();
+    openNoteSession(session.id);
+  }, [openNoteSession]);
+
+  const handleRenameNoteSession = useCallback(
+    (id: string, name: string) => {
+      renameNoteSession(id, name);
+      const sessions = loadNoteSessions();
+      const session = sessions.find((session) => session.id === id);
+      if (session && id === loadedNoteSessionIdRef.current && excalidrawAPI) {
+        // the canvas name and the session name are the same thing
+        excalidrawAPI.updateScene({
+          appState: { name: session.name },
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+      }
+      setNoteSessions(sessions);
+    },
+    [excalidrawAPI],
+  );
+
+  const handleDuplicateNoteSession = useCallback(
+    async (id: string) => {
+      if (id === loadedNoteSessionIdRef.current) {
+        // make sure the copy includes edits that haven't been written yet
+        await LocalData.flushSave();
+      }
+      const duplicate = await duplicateNoteSession(id);
+      if (duplicate) {
+        await openNoteSession(duplicate.id);
+      }
+    },
+    [openNoteSession],
+  );
+
+  const handleDeleteNoteSession = useCallback(
+    async (id: string) => {
+      const wasLoaded = id === loadedNoteSessionIdRef.current;
+      if (wasLoaded) {
+        // drop pending edits, or they'd re-create the scene we just deleted
+        LocalData.cancelSave();
+      }
+      const next = await deleteNoteSession(id);
+      if (wasLoaded) {
+        setActiveNoteSessionId(next.id);
+        await loadNoteSessionIntoEditor(next.id);
+      } else {
+        syncNoteSessionsFromStorage();
+      }
+    },
+    [loadNoteSessionIntoEditor, syncNoteSessionsFromStorage],
   );
 
   useEffect(() => {
@@ -564,6 +725,8 @@ const ExcalidrawWrapper = () => {
 
     initializeScene({ collabAPI, excalidrawAPI }).then(async (data) => {
       loadImages(data, /* isInitialLoad */ true);
+      loadedNoteSessionIdRef.current = data.noteSession.id;
+      syncNoteSessionsFromStorage();
       initialStatePromiseRef.current.promise.resolve(data.scene);
     });
 
@@ -602,15 +765,34 @@ const ExcalidrawWrapper = () => {
         !document.hidden &&
         ((collabAPI && !collabAPI.isCollaborating()) || isCollabDisabled)
       ) {
+        // another tab added, renamed, deleted or switched note sessions
+        if (isBrowserStorageStateNewer(STORAGE_KEYS.VERSION_NOTE_SESSIONS)) {
+          const activeId = getActiveNoteSessionId();
+          if (activeId && activeId !== loadedNoteSessionIdRef.current) {
+            // that tab opened a different session; follow it
+            loadNoteSessionIntoEditor(activeId);
+          } else {
+            syncNoteSessionsFromStorage();
+          }
+        }
+
         // don't sync if local state is newer or identical to browser state
         if (isBrowserStorageStateNewer(STORAGE_KEYS.VERSION_DATA_STATE)) {
-          const localDataState = importFromLocalStorage();
+          const activeId = getActiveNoteSessionId();
+          const session = loadNoteSessions().find(
+            (session) => session.id === activeId,
+          );
           const username = importUsernameFromLocalStorage();
           setLangCode(getPreferredLanguage());
-          excalidrawAPI.updateScene({
-            ...localDataState,
-            captureUpdate: CaptureUpdateAction.NEVER,
-          });
+          // if the active session changed, the branch above already loaded it
+          if (session && session.id === loadedNoteSessionIdRef.current) {
+            importNoteSessionFromStorage(session).then((localDataState) => {
+              excalidrawAPI.updateScene({
+                ...localDataState,
+                captureUpdate: CaptureUpdateAction.NEVER,
+              });
+            });
+          }
           LibraryIndexedDBAdapter.load().then((data) => {
             if (data) {
               excalidrawAPI.updateLibrary({
@@ -685,7 +867,15 @@ const ExcalidrawWrapper = () => {
         false,
       );
     };
-  }, [isCollabDisabled, collabAPI, excalidrawAPI, setLangCode, loadImages]);
+  }, [
+    isCollabDisabled,
+    collabAPI,
+    excalidrawAPI,
+    setLangCode,
+    loadImages,
+    loadNoteSessionIntoEditor,
+    syncNoteSessionsFromStorage,
+  ]);
 
   useEffect(() => {
     const unloadHandler = (event: BeforeUnloadEvent) => {
@@ -1033,6 +1223,8 @@ const ExcalidrawWrapper = () => {
           isCollabEnabled={!isCollabDisabled}
           theme={appTheme}
           refresh={() => forceRefresh((prev) => !prev)}
+          onOpenNoteSessions={openNoteSessionsSidebar}
+          onCreateNoteSession={handleCreateNoteSession}
         />
         <AppWelcomeScreen
           onCollabDialogOpen={onCollabDialogOpen}
@@ -1100,7 +1292,17 @@ const ExcalidrawWrapper = () => {
           }}
         />
 
-        <AppSidebar />
+        <AppSidebar
+          noteSessions={{
+            sessions: noteSessions,
+            activeSessionId: activeNoteSessionId,
+            onSelect: openNoteSession,
+            onCreate: handleCreateNoteSession,
+            onRename: handleRenameNoteSession,
+            onDuplicate: handleDuplicateNoteSession,
+            onDelete: handleDeleteNoteSession,
+          }}
+        />
 
         {errorMessage && (
           <ErrorDialog onClose={() => setErrorMessage("")}>

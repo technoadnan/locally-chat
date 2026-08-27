@@ -1,12 +1,15 @@
-import {
-  clearAppStateForLocalStorage,
-  getDefaultAppState,
-} from "@excalidraw/excalidraw/appState";
-
-import type { ExcalidrawElement } from "@excalidraw/element/types";
-import type { AppState } from "@excalidraw/excalidraw/types";
+import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 
 import { STORAGE_KEYS } from "../app_constants";
+
+import {
+  getActiveNoteSessionId,
+  getAllNoteSessionsStorageSize,
+  getNoteSessionStorageSize,
+  loadNoteSessionScene,
+} from "./noteSessions";
+
+import type { NoteSessionMeta } from "./noteSessions";
 
 export const saveUsernameToLocalStorage = (username: string) => {
   try {
@@ -34,67 +37,41 @@ export const importUsernameFromLocalStorage = (): string | null => {
   return null;
 };
 
-export const importFromLocalStorage = () => {
-  let savedElements = null;
-  let savedState = null;
+/**
+ * Loads the scene of a note session. Replaces upstream's
+ * `importFromLocalStorage`, which could only ever read the one scene the app
+ * kept under a fixed localStorage key.
+ */
+export const importNoteSessionFromStorage = async (
+  session: NoteSessionMeta,
+) => {
+  const { elements, appState } = await loadNoteSessionScene(session.id);
 
-  try {
-    savedElements = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
-    savedState = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
-  } catch (error: any) {
-    // Unable to access localStorage
-    console.error(error);
-  }
-
-  let elements: ExcalidrawElement[] = [];
-  if (savedElements) {
-    try {
-      elements = JSON.parse(savedElements);
-    } catch (error: any) {
-      console.error(error);
-      // Do nothing because elements array is already empty
-    }
-  }
-
-  let appState = null;
-  if (savedState) {
-    try {
-      appState = {
-        ...getDefaultAppState(),
-        ...clearAppStateForLocalStorage(
-          JSON.parse(savedState) as Partial<AppState>,
-        ),
-      };
-    } catch (error: any) {
-      console.error(error);
-      // Do nothing because appState is already null
-    }
-  }
-  return { elements, appState };
+  return {
+    elements,
+    appState: {
+      ...getDefaultAppState(),
+      ...appState,
+      // the sessions list is the source of truth for the name, so a rename
+      // made while this session was closed wins over the stored appState
+      name: session.name,
+    },
+  };
 };
 
-export const getElementsStorageSize = () => {
-  try {
-    const elements = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS);
-    const elementsSize = elements?.length || 0;
-    return elementsSize;
-  } catch (error: any) {
-    console.error(error);
-    return 0;
-  }
+export const getElementsStorageSize = async () => {
+  const activeId = getActiveNoteSessionId();
+  return activeId ? getNoteSessionStorageSize(activeId) : 0;
 };
 
-export const getTotalStorageSize = () => {
+export const getTotalStorageSize = async () => {
+  let collabSize = 0;
   try {
-    const appState = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_APP_STATE);
-    const collab = localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_COLLAB);
-
-    const appStateSize = appState?.length || 0;
-    const collabSize = collab?.length || 0;
-
-    return appStateSize + collabSize + getElementsStorageSize();
+    collabSize =
+      localStorage.getItem(STORAGE_KEYS.LOCAL_STORAGE_COLLAB)?.length || 0;
   } catch (error: any) {
     console.error(error);
-    return 0;
   }
+
+  return collabSize + (await getAllNoteSessionsStorageSize());
 };

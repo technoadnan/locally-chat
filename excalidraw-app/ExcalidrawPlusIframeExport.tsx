@@ -8,8 +8,11 @@ import type {
 } from "@excalidraw/element/types";
 import type { AppState, BinaryFileData } from "@excalidraw/excalidraw/types";
 
-import { STORAGE_KEYS } from "./app_constants";
 import { LocalData } from "./data/LocalData";
+import {
+  getActiveNoteSessionId,
+  loadNoteSessionScene,
+} from "./data/noteSessions";
 
 const EVENT_REQUEST_SCENE = "REQUEST_SCENE";
 
@@ -39,30 +42,27 @@ type MESSAGE_SCENE_DATA = {
 type MESSAGE_FROM_EDITOR = MESSAGE_ERROR | MESSAGE_SCENE_DATA | MESSAGE_READY;
 // -----------------------------------------------------------------------------
 
-const parseSceneData = async ({
-  rawElementsString,
-  rawAppStateString,
-}: {
-  rawElementsString: string | null;
-  rawAppStateString: string | null;
-}): Promise<MESSAGE_SCENE_DATA> => {
-  if (!rawElementsString || !rawAppStateString) {
+/** exports the note session currently open */
+const parseSceneData = async (): Promise<MESSAGE_SCENE_DATA> => {
+  const activeSessionId = getActiveNoteSessionId();
+  if (!activeSessionId) {
+    throw new ExcalidrawError("No note session is open.");
+  }
+
+  const scene = await loadNoteSessionScene(activeSessionId);
+
+  if (!scene.appState) {
     throw new ExcalidrawError("Elements or appstate is missing.");
   }
 
   try {
-    const elements = JSON.parse(
-      rawElementsString,
-    ) as OrderedExcalidrawElement[];
+    const elements = scene.elements as OrderedExcalidrawElement[];
 
     if (!elements.length) {
       throw new ExcalidrawError("Scene is empty, nothing to export.");
     }
 
-    const appState = JSON.parse(rawAppStateString) as Pick<
-      AppState,
-      "viewBackgroundColor"
-    >;
+    const appState = scene.appState as Pick<AppState, "viewBackgroundColor">;
 
     const fileIds = elements.reduce((acc, el) => {
       if ("fileId" in el && el.fileId) {
@@ -175,14 +175,7 @@ export const ExcalidrawPlusIframeExport = () => {
             throw new ExcalidrawError("Failed to verify JWT");
           }
 
-          const parsedSceneData: MESSAGE_SCENE_DATA = await parseSceneData({
-            rawAppStateString: localStorage.getItem(
-              STORAGE_KEYS.LOCAL_STORAGE_APP_STATE,
-            ),
-            rawElementsString: localStorage.getItem(
-              STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS,
-            ),
-          });
+          const parsedSceneData: MESSAGE_SCENE_DATA = await parseSceneData();
 
           event.source!.postMessage(parsedSceneData, {
             targetOrigin: EXCALIDRAW_PLUS_ORIGIN,

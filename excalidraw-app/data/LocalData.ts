@@ -10,7 +10,6 @@
  *   (localStorage, indexedDB).
  */
 
-import { clearAppStateForLocalStorage } from "@excalidraw/excalidraw/appState";
 import {
   CANVAS_SEARCH_TAB,
   DEFAULT_SIDEBAR,
@@ -25,8 +24,6 @@ import {
   setMany,
   get,
 } from "idb-keyval";
-
-import { getNonDeletedElements } from "@excalidraw/element";
 
 import type { LibraryPersistedData } from "@excalidraw/excalidraw/data/library";
 import type { ImportedDataState } from "@excalidraw/excalidraw/data/types";
@@ -44,6 +41,11 @@ import { SAVE_TO_LOCAL_STORAGE_TIMEOUT, STORAGE_KEYS } from "../app_constants";
 import { FileManager } from "./FileManager";
 import { FileStatusStore } from "./fileStatusStore";
 import { Locker } from "./Locker";
+import {
+  getActiveNoteSessionId,
+  getFileIdsAcrossNoteSessions,
+  saveNoteSessionScene,
+} from "./noteSessions";
 import { updateBrowserStateVersion } from "./tabSync";
 
 const filesStore = createStore("files-db", "files-store");
@@ -52,16 +54,23 @@ export const localStorageQuotaExceededAtom = atom(false);
 
 class LocalFileManager extends FileManager {
   clearObsoleteFiles = async (opts: { currentFileIds: FileId[] }) => {
+    // files are shared by every note session, so a file is only obsolete once
+    // no session references it — not merely the one currently open
+    const referencedFileIds = new Set([
+      ...opts.currentFileIds,
+      ...(await getFileIdsAcrossNoteSessions()),
+    ]);
+
     await entries(filesStore).then((entries) => {
       for (const [id, imageData] of entries as [FileId, BinaryFileData][]) {
-        // if image is unused (not on canvas) & is older than 1 day, delete it
-        // from storage. We check `lastRetrieved` we care about the last time
+        // if image is unused (not on any canvas) & is older than 1 day, delete
+        // it from storage. We check `lastRetrieved` we care about the last time
         // the image was used (loaded on canvas), not when it was initially
         // created.
         if (
           (!imageData.lastRetrieved ||
             Date.now() - imageData.lastRetrieved > 24 * 3600 * 1000) &&
-          !opts.currentFileIds.includes(id as FileId)
+          !referencedFileIds.has(id as FileId)
         ) {
           del(id, filesStore);
         }
@@ -70,15 +79,14 @@ class LocalFileManager extends FileManager {
   };
 }
 
-const saveDataStateToLocalStorage = (
+const saveDataStateToStorage = async (
+  sessionId: string,
   elements: readonly ExcalidrawElement[],
   appState: AppState,
 ) => {
-  const localStorageQuotaExceeded = appJotaiStore.get(
-    localStorageQuotaExceededAtom,
-  );
+  const storageQuotaExceeded = appJotaiStore.get(localStorageQuotaExceededAtom);
   try {
-    const _appState = clearAppStateForLocalStorage(appState);
+    const _appState = { ...appState };
 
     if (
       _appState.openSidebar?.name === DEFAULT_SIDEBAR.name &&
@@ -87,22 +95,16 @@ const saveDataStateToLocalStorage = (
       _appState.openSidebar = null;
     }
 
-    localStorage.setItem(
-      STORAGE_KEYS.LOCAL_STORAGE_ELEMENTS,
-      JSON.stringify(getNonDeletedElements(elements)),
-    );
-    localStorage.setItem(
-      STORAGE_KEYS.LOCAL_STORAGE_APP_STATE,
-      JSON.stringify(_appState),
-    );
+    await saveNoteSessionScene(sessionId, elements, _appState);
+
     updateBrowserStateVersion(STORAGE_KEYS.VERSION_DATA_STATE);
-    if (localStorageQuotaExceeded) {
+    if (storageQuotaExceeded) {
       appJotaiStore.set(localStorageQuotaExceededAtom, false);
     }
   } catch (error: any) {
-    // Unable to access window.localStorage
+    // Unable to access browser storage
     console.error(error);
-    if (isQuotaExceededError(error) && !localStorageQuotaExceeded) {
+    if (isQuotaExceededError(error) && !storageQuotaExceeded) {
       appJotaiStore.set(localStorageQuotaExceededAtom, true);
     }
   }
@@ -115,20 +117,30 @@ const isQuotaExceededError = (error: any) => {
 type SavingLockTypes = "collaboration";
 
 export class LocalData {
+  /**
+   * Resolves once the most recently triggered write has hit storage. Callers
+   * that read a scene back (switching or duplicating a note session) must await
+   * this, or they may read data that is one edit stale.
+   */
+  private static _pendingSave: Promise<void> = Promise.resolve();
+
   private static _save = debounce(
-    async (
+    (
+      sessionId: string,
       elements: readonly ExcalidrawElement[],
       appState: AppState,
       files: BinaryFiles,
       onFilesSaved: () => void,
     ) => {
-      saveDataStateToLocalStorage(elements, appState);
+      this._pendingSave = (async () => {
+        await saveDataStateToStorage(sessionId, elements, appState);
 
-      await this.fileStorage.saveFiles({
-        elements,
-        files,
-      });
-      onFilesSaved();
+        await this.fileStorage.saveFiles({
+          elements,
+          files,
+        });
+        onFilesSaved();
+      })();
     },
     SAVE_TO_LOCAL_STORAGE_TIMEOUT,
   );
@@ -141,13 +153,32 @@ export class LocalData {
     onFilesSaved: () => void,
   ) => {
     // we need to make the `isSavePaused` check synchronously (undebounced)
-    if (!this.isSavePaused()) {
-      this._save(elements, appState, files, onFilesSaved);
+    if (this.isSavePaused()) {
+      return;
     }
+    // resolve the target session *now* rather than when the debounced write
+    // runs, so a save queued before a session switch still lands on the
+    // session the edits were actually made in
+    const sessionId = getActiveNoteSessionId();
+    if (!sessionId) {
+      return;
+    }
+    this._save(sessionId, elements, appState, files, onFilesSaved);
   };
 
-  static flushSave = () => {
+  /**
+   * Writes any debounced changes immediately. The returned promise resolves
+   * once they're durably stored; sync callers (unload handlers) can ignore it,
+   * since the write is still *triggered* synchronously.
+   */
+  static flushSave = (): Promise<void> => {
     this._save.flush();
+    return this._pendingSave;
+  };
+
+  /** Drops pending changes without writing them (e.g. session was deleted) */
+  static cancelSave = () => {
+    this._save.cancel();
   };
 
   private static locker = new Locker<SavingLockTypes>();

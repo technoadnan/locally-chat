@@ -1,3 +1,54 @@
+# locally-chat
+
+A fork of [Excalidraw](https://github.com/excalidraw/excalidraw) that stores **many note sessions** locally instead of the single canvas upstream keeps in `localStorage`.
+
+## What's different from upstream
+
+Upstream Excalidraw persists exactly one scene, under the fixed `localStorage` keys `excalidraw` (elements) and `excalidraw-state` (appState). Reloading always brings back that one canvas, and there is no way to keep a second one.
+
+This fork replaces that with note sessions:
+
+- **Any number of boards.** Create, rename, duplicate and delete them from the _Note sessions_ tab in the right sidebar (also reachable from the hamburger menu). The board you have open is restored on reload.
+- **Renaming is the canvas name.** A session's name and the editor's canvas name (`appState.name`) are the same thing, so renaming in either place is reflected in the other.
+- **Scenes live in indexedDB**, one record per session, keyed by session id. Only the small session index (id, name, timestamps) and the id of the open session stay in `localStorage` — several scenes would not fit in its ~5MB budget.
+- **Images are shared across sessions.** Binary files keep their own indexedDB store keyed by file id, as upstream, but obsolete-file cleanup now considers every session's scene rather than only the open one, so images on boards you aren't looking at don't get garbage collected.
+- **Existing scenes are migrated.** On first load the old single-canvas `localStorage` keys are imported as your first note session and then cleared, so nothing is lost.
+
+Which session is open is global rather than per-tab, preserving upstream's behaviour of every tab mirroring the same scene. Opening, renaming or deleting a session in one tab is picked up by the others.
+
+### Where the code lives
+
+| Path | Purpose |
+| --- | --- |
+| `excalidraw-app/data/noteSessions.ts` | The session store: index, per-session scenes, migration |
+| `excalidraw-app/data/LocalData.ts` | Saves the open session's scene; cross-session file cleanup |
+| `excalidraw-app/data/localStorage.ts` | Loads a session's scene; storage sizing for the stats panel |
+| `excalidraw-app/components/NoteSessionsPanel.tsx` | The sessions list UI |
+| `excalidraw-app/App.tsx` | Session state, switching, and cross-tab sync |
+| `excalidraw-app/tests/noteSessions.test.ts` | Tests for the storage layer |
+
+## Running it
+
+```bash
+yarn            # install
+yarn start      # dev server on http://localhost:3000
+yarn build:app  # production build into excalidraw-app/build
+```
+
+Checks, all of which pass on this branch:
+
+```bash
+yarn test:typecheck
+yarn test:code
+yarn test:app --watch=false
+```
+
+---
+
+Upstream project readme follows.
+
+---
+
 <a href="https://excalidraw.com/" target="_blank" rel="noopener">
   <picture>
     <source media="(prefers-color-scheme: dark)" alt="Excalidraw" srcset="https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github/excalidraw_github_cover_2_dark.png" />

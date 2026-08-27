@@ -2,11 +2,18 @@ import { DefaultSidebar, Sidebar, THEME } from "@excalidraw/excalidraw";
 import {
   messageCircleIcon,
   presentationIcon,
+  file as fileIcon,
 } from "@excalidraw/excalidraw/components/icons";
 import { LinkButton } from "@excalidraw/excalidraw/components/LinkButton";
 import { useUIAppState } from "@excalidraw/excalidraw/context/ui-appState";
 
+import { NOTE_SESSIONS_SIDEBAR_TAB } from "../app_constants";
+
+import { NoteSessionsPanel } from "./NoteSessionsPanel";
+
 import "./AppSidebar.scss";
+
+import type { NoteSessionsPanelProps } from "./NoteSessionsPanel";
 
 type SidebarPromoCopyProps = {
   text: string;
@@ -65,12 +72,21 @@ const SidebarPromoCopy = (props: SidebarPromoCopyProps) => {
   );
 };
 
-export const AppSidebar = () => {
+export const AppSidebar = (props: { noteSessions: NoteSessionsPanelProps }) => {
   const { theme, openSidebar } = useUIAppState();
 
   return (
     <DefaultSidebar>
       <DefaultSidebar.TabTriggers>
+        <Sidebar.TabTrigger
+          tab={NOTE_SESSIONS_SIDEBAR_TAB}
+          title="Note sessions"
+          style={{
+            opacity: openSidebar?.tab === NOTE_SESSIONS_SIDEBAR_TAB ? 1 : 0.4,
+          }}
+        >
+          {fileIcon}
+        </Sidebar.TabTrigger>
         <Sidebar.TabTrigger
           tab="comments"
           style={{ opacity: openSidebar?.tab === "comments" ? 1 : 0.4 }}
@@ -84,6 +100,9 @@ export const AppSidebar = () => {
           {presentationIcon}
         </Sidebar.TabTrigger>
       </DefaultSidebar.TabTriggers>
+      <Sidebar.Tab tab={NOTE_SESSIONS_SIDEBAR_TAB}>
+        <NoteSessionsPanel {...props.noteSessions} />
+      </Sidebar.Tab>
       <Sidebar.Tab tab="comments">
         <div className="app-sidebar-promo-container">
           <div

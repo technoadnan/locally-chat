@@ -22,10 +22,10 @@ type StorageSizes = { scene: number; total: number };
 const STORAGE_SIZE_TIMEOUT = 500;
 
 const getStorageSizes = debounce((cb: (sizes: StorageSizes) => void) => {
-  cb({
-    scene: getElementsStorageSize(),
-    total: getTotalStorageSize(),
-  });
+  // scenes live in indexedDB (one per note session), so sizing is async
+  Promise.all([getElementsStorageSize(), getTotalStorageSize()]).then(
+    ([scene, total]) => cb({ scene, total }),
+  );
 }, STORAGE_SIZE_TIMEOUT);
 
 type Props = {

@@ -37,20 +37,30 @@ export const FIREBASE_STORAGE_PREFIXES = {
 export const ROOM_ID_BYTES = 10;
 
 export const STORAGE_KEYS = {
-  LOCAL_STORAGE_ELEMENTS: "excalidraw",
-  LOCAL_STORAGE_APP_STATE: "excalidraw-state",
   LOCAL_STORAGE_COLLAB: "excalidraw-collab",
   LOCAL_STORAGE_THEME: "excalidraw-theme",
   LOCAL_STORAGE_DEBUG: "excalidraw-debug",
+  /** index of all note sessions (metadata only, scenes live in indexedDB) */
+  LOCAL_STORAGE_NOTE_SESSIONS: "excalidraw-note-sessions",
+  /** id of the note session currently open */
+  LOCAL_STORAGE_ACTIVE_NOTE_SESSION: "excalidraw-note-session-active",
   VERSION_DATA_STATE: "version-dataState",
   VERSION_FILES: "version-files",
+  VERSION_NOTE_SESSIONS: "version-noteSessions",
 
   IDB_LIBRARY: "excalidraw-library",
   IDB_TTD_CHATS: "excalidraw-ttd-chats",
+  /** scene data (elements + appState), keyed by note session id */
+  IDB_NOTE_SESSIONS: "excalidraw-note-session-scenes",
 
   // do not use apart from migrations
   __LEGACY_LOCAL_STORAGE_LIBRARY: "excalidraw-library",
+  __LEGACY_LOCAL_STORAGE_ELEMENTS: "excalidraw",
+  __LEGACY_LOCAL_STORAGE_APP_STATE: "excalidraw-state",
 } as const;
+
+/** sidebar tab listing the locally-stored note sessions */
+export const NOTE_SESSIONS_SIDEBAR_TAB = "note-sessions";
 
 export const COOKIES = {
   AUTH_STATE_COOKIE: "excplus-auth",
