@@ -451,6 +451,18 @@ export class UI {
     fireEvent.click(GlobalTestState.renderResult.getByToolName(toolName));
   };
 
+  /**
+   * Activates a tool and opens its styles panel, the way double-clicking the
+   * tool's button does. Use instead of `clickTool` whenever the test goes on
+   * to interact with the panel — a single click activates the tool with its
+   * current settings and leaves the panel closed.
+   */
+  static clickToolWithStyles = (toolName: ToolType | "lock") => {
+    const button = GlobalTestState.renderResult.getByToolName(toolName);
+    fireEvent.click(button);
+    fireEvent.doubleClick(button);
+  };
+
   static clickLabeledElement = (label: string) => {
     const element = document.querySelector(`[aria-label='${label}']`);
     if (!element) {

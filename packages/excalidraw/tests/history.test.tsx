@@ -1253,7 +1253,9 @@ describe("history", () => {
       mouse.down(-10, -10);
       mouse.up(10, 10);
 
-      UI.clickTool("freedraw");
+      // the test goes on to restyle via the panel, which a plain click leaves
+      // closed
+      UI.clickToolWithStyles("freedraw");
       mouse.down(40, -20);
       mouse.up(50, 10);
 

@@ -56,6 +56,12 @@ type IconButtonProps =
        * (unlike the click event's own pointerType on iOS).
        */
       onSelect?(data: { pointerType: PointerType | null }): void;
+      /**
+       * Fired on a pointer double-click, after the two `onSelect` calls the
+       * gesture also produces. Keyboard/AT activation never triggers it, so
+       * anything it does must stay optional.
+       */
+      onDoubleSelect?(): void;
     });
 
 export const IconButton = React.forwardRef(
@@ -180,6 +186,9 @@ export const IconButton = React.forwardRef(
         }}
         onClick={() => {
           props.onSelect?.({ pointerType: lastPointerTypeRef.current });
+        }}
+        onDoubleClick={() => {
+          props.onDoubleSelect?.();
         }}
         ref={innerRef}
       >

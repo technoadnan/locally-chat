@@ -66,7 +66,7 @@ beforeEach(async () => {
 
   // The bounds of hand-drawn linear elements may change after flipping, so
   // removing this style for testing
-  UI.clickTool("arrow");
+  UI.clickToolWithStyles("arrow");
   UI.clickByTitle("Architect");
   UI.clickTool("selection");
 });
@@ -530,7 +530,7 @@ describe("arrow element", () => {
       width: 95,
       height: 100,
     });
-    UI.clickTool("arrow");
+    UI.clickToolWithStyles("arrow");
     UI.clickOnTestId("elbow-arrow");
     mouse.reset();
     mouse.moveTo(-5, 0);
@@ -558,7 +558,7 @@ describe("arrow element", () => {
       width: 95,
       height: 100,
     });
-    UI.clickTool("arrow");
+    UI.clickToolWithStyles("arrow");
     UI.clickOnTestId("elbow-arrow");
     mouse.reset();
     mouse.moveTo(-5, 0);
@@ -928,7 +928,7 @@ describe("multiple selection", () => {
   });
 
   it("resizes with linear elements > 2 points", async () => {
-    UI.clickTool("line");
+    UI.clickToolWithStyles("line");
     UI.clickByTitle("Sharp");
 
     const line = UI.createElement("line", {
@@ -1113,7 +1113,7 @@ describe("multiple selection", () => {
     });
     const topArrowLabel = await UI.editText(topArrow.get(), "lorem ipsum");
 
-    UI.clickTool("text");
+    UI.clickToolWithStyles("text");
     UI.clickByTitle("Large");
     const bottomArrow = UI.createElement("arrow", {
       x: 0,
@@ -1184,7 +1184,7 @@ describe("multiple selection", () => {
     const topText = UI.createElement("text", { position: 0 });
     await UI.editText(topText, "lorem ipsum");
 
-    UI.clickTool("text");
+    UI.clickToolWithStyles("text");
     UI.clickByTitle("Large");
     const bottomText = UI.createElement("text", { position: 40 });
     await UI.editText(bottomText, "dolor\nsit amet");

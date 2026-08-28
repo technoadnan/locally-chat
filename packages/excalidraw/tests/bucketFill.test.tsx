@@ -29,9 +29,14 @@ const { h } = window;
 
 const mouse = new Pointer("mouse");
 
-const selectBucketFill = () => {
+const selectBucketFill = ({ withStyles = false } = {}) => {
   act(() => {
     h.app.setActiveTool({ type: "bucketfill" });
+    if (withStyles) {
+      // activating a tool leaves its styles panel closed; tests that assert on
+      // the panel open it the way double-clicking the tool button does
+      h.app.setStylesPanelOpen(true);
+    }
   });
 };
 
@@ -454,7 +459,7 @@ describe("bucket fill tool", () => {
 
   it("shows fill color, fill style and opacity in the panel when the tool is active", () => {
     seedRectangle();
-    selectBucketFill();
+    selectBucketFill({ withStyles: true });
 
     const panel = document.querySelector(".selected-shape-actions");
     expect(panel).not.toBeNull();
@@ -505,7 +510,7 @@ describe("bucket fill tool", () => {
     // so the picker didn't stop propagation and App.onKeyDown toggled the
     // global tool lock while the color dialog was open
     seedRectangle();
-    selectBucketFill();
+    selectBucketFill({ withStyles: true });
     togglePopover("Background");
 
     const picker = document.querySelector(".color-picker-content")!;

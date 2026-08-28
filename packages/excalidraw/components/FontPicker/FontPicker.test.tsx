@@ -1,7 +1,5 @@
-import { KEYS } from "@excalidraw/common";
-
 import { Excalidraw } from "../..";
-import { Keyboard } from "../../tests/helpers/ui";
+import { UI } from "../../tests/helpers/ui";
 import { act, render } from "../../tests/test-utils";
 
 describe("FontPicker", () => {
@@ -18,7 +16,9 @@ describe("FontPicker", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
 
-    Keyboard.keyPress(KEYS.T);
+    // the keyboard shortcut activates the tool but leaves the styles panel
+    // closed, so open it the way a double-click on the tool button does
+    UI.clickToolWithStyles("text");
 
     const fontPickerTrigger = queryByTestId("font-family-show-fonts");
 

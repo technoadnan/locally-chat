@@ -65,12 +65,12 @@ describe("note sessions", () => {
       appState("B"),
     );
 
-    expect((await loadNoteSessionScene(a.id)).elements.map((el) => el.id)).toEqual(
-      ["a1"],
-    );
-    expect((await loadNoteSessionScene(b.id)).elements.map((el) => el.id)).toEqual(
-      ["b1", "b2"],
-    );
+    expect(
+      (await loadNoteSessionScene(a.id)).elements.map((el) => el.id),
+    ).toEqual(["a1"]);
+    expect(
+      (await loadNoteSessionScene(b.id)).elements.map((el) => el.id),
+    ).toEqual(["b1", "b2"]);
   });
 
   it("returns an empty scene for a session that was never saved", async () => {
@@ -110,7 +110,11 @@ describe("note sessions", () => {
 
   it("duplicates a session with a copy of its scene", async () => {
     const source = createNoteSession("Source");
-    await saveNoteSessionScene(source.id, [rectangle("s1")], appState("Source"));
+    await saveNoteSessionScene(
+      source.id,
+      [rectangle("s1")],
+      appState("Source"),
+    );
 
     const duplicate = await duplicateNoteSession(source.id);
 
@@ -131,7 +135,11 @@ describe("note sessions", () => {
   it("deletes a session along with its scene", async () => {
     const doomed = createNoteSession("Doomed");
     const keeper = createNoteSession("Keeper");
-    await saveNoteSessionScene(doomed.id, [rectangle("d1")], appState("Doomed"));
+    await saveNoteSessionScene(
+      doomed.id,
+      [rectangle("d1")],
+      appState("Doomed"),
+    );
 
     const next = await deleteNoteSession(doomed.id);
 
