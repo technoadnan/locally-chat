@@ -1,0 +1,20 @@
+{
+  "name": "locally-chat",
+  "compatibility_date": "2026-08-28",
+
+  // This repo is a yarn workspace root, and wrangler refuses to guess which
+  // workspace member to deploy ("application detection logic has been run in
+  // the root of a workspace"). Naming the built app explicitly here settles it,
+  // so `wrangler deploy` can keep running from the repo root — which it has to,
+  // since yarn workspaces only install correctly from there.
+  //
+  // The app is a static SPA with no server code, so there's no `main` worker
+  // script: Cloudflare serves the assets directly.
+  "assets": {
+    // produced by `yarn build:app` (vite `build.outDir`)
+    "directory": "./excalidraw-app/build",
+    // client-side routing and shared-scene links (/#json=...) must fall back to
+    // index.html rather than 404
+    "not_found_handling": "single-page-application"
+  }
+}
